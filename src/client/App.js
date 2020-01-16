@@ -1,7 +1,7 @@
 import './App.css';
 import React, {useState, useEffect} from 'react';
 
-import {ResponsiveLine} from '@nivo/line';
+import {ResponsiveLineCanvas} from '@nivo/line';
 
 const refresh = onDone => {
   return fetch('/api/fit').then(async response => {
@@ -68,21 +68,26 @@ export default function App() {
         </button>
       </span>
       {data.length > 0 ? (
-        <ResponsiveLine
+        <ResponsiveLineCanvas
           data={data}
+          xScale={{
+            type: 'linear'
+            // format: '%s',
+            // precision: 'second'
+          }}
           margin={{top: 50, right: 50, bottom: 50, left: 50}}
-          gridXValues={[0, 20, 40, 60, 80, 100, 120]}
-          gridYValues={[60, 80, 100, 120, 140, 160, 180]}
-          // axisBottom={{
-          //   tickValues: [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000],
-          //   tickSize: 100,
-          //   tickPadding: 5,
-          //   tickRotation: 0,
-          //   // format: '.2f',
-          //   // legend: 'price',
-          //   // legendOffset: 36,
-          //   legendPosition: 'middle'
-          // }}
+          // gridXValues={[0, 20, 40, 60, 80, 100, 120]}
+          // gridYValues={[60, 80, 100, 120, 140, 160, 180]}
+          axisBottom={{
+            // tickValues: 'every 50 seconds',
+            // tickSize: 1
+            tickPadding: 10
+            // tickRotation: 0,
+            // format: '.2f',
+            // legend: 'price',
+            // legendOffset: 36,
+            // legendPosition: 'middle'
+          }}
         />
       ) : null}
     </span>
