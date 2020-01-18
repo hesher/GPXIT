@@ -1,24 +1,18 @@
+/* eslint-disable no-restricted-syntax */
 import './App.css';
-import React, {
-  useState,
-  useEffect
-} from 'react';
+import React, {useState, useEffect} from 'react';
 
 import {ResponsiveLineCanvas} from '@nivo/line';
 
 const refresh = onDone => {
-  return fetch('/api/fit').then(
-    async response => {
-      if (response.ok) {
-        const responseData = await response.json();
-        onDone(responseData);
-      } else {
-        throw Error(
-          `${response.status}: ${response.statusText}`
-        );
-      }
+  return fetch('/api/fit').then(async response => {
+    if (response.ok) {
+      const responseData = await response.json();
+      onDone(responseData);
+    } else {
+      throw Error(`${response.status}: ${response.statusText}`);
     }
-  );
+  });
 };
 export default function App() {
   const [data, setData] = useState([]);
@@ -29,9 +23,7 @@ export default function App() {
   console.log({data});
   return (
     <span className="app-container">
-      <FileUploader
-        onSetFileData={setData}
-      />
+      <FileUploader onSetFileData={setData} />
       {data.length > 0 ? (
         <ResponsiveLineCanvas
           data={data}
@@ -70,31 +62,28 @@ export default function App() {
   );
 }
 
-const FileUploader = ({
-  onSetFileData
-}) => {
-  const [file, setFile] = useState();
+const FileUploader = ({onSetFileData}) => {
+  const [files, setFiles] = useState();
   return (
     <span className="file-uploader">
       <input
         type="file"
         name="file"
         accept=".fit"
+        multiple="multiple"
         onChange={event => {
-          setFile(
-            event.target.files[0]
-          );
+          setFiles(event.target.files);
         }}
       />
       <button
         type="button"
         onClick={() => {
-          if (file !== null) {
+          if (files !== null) {
             const formData = new FormData();
-            formData.append(
-              'file',
-              file
-            );
+            for (const file of files) {
+              formData.append(`files`, file);
+            }
+
             fetch('/api/upload', {
               // Your POST endpoint
               method: 'POST',
@@ -106,13 +95,10 @@ const FileUploader = ({
                 refresh(onSetFileData);
               })
               .catch(
-                error =>
-                  console.log(error) // Handle the error response object
+                error => console.log(error) // Handle the error response object
               );
           } else {
-            console.error(
-              'Tried to upload an empty file'
-            );
+            console.error('Tried to upload an empty file');
           }
         }}>
         Upload

@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const fs = require('fs');
 // const cors = require('cors');
 const multer = require('multer');
+const {promisfy} = require('promisfy');
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -12,17 +13,11 @@ const upload = multer({
 
 const app = express();
 // const gpxParse = require('gpx-parse');
-const FitParser = require('fit-file-parser')
-  .default;
+const FitParser = require('fit-file-parser').default;
 
-let savedFile = null;
+let savedFiles = null;
 
-function fitParse(
-  content,
-  next,
-  req,
-  res
-) {
+function fitParse(content, next, req, res) {
   const fitParser = new FitParser({
     force: true,
     speedUnit: 'km/h',
@@ -32,47 +27,26 @@ function fitParse(
     mode: 'cascade'
   });
 
-  return fitParser.parse(
-    content,
-    (error, data) => {
-      // Handle result of parse method
-      if (error) {
-        next(error);
-      } else {
-        // res.send(
-        //   `${JSON.stringify(
-        //     data.activity.sessions[0].laps[0].records,
-        //     null,
-        //     2
-        //   )}`
-        // );
+  return fitParser.parse(content, (error, data) => {
+    // Handle result of parse method
+    if (error) {
+      next(error);
+    } else {
+      const {records} = data.activity.sessions[0].laps[0];
 
-        const {
-          records
-        } = data.activity.sessions[0].laps[0];
-
-        const heartBeats = records.map(
-          record => ({
-            y: record.heart_rate,
-            x: record.timer_time
-          })
-        );
-        const chartData = [
-          {
-            id: 'heart_rate',
-            data: heartBeats
-          }
-        ];
-        res.send(
-          JSON.stringify(
-            chartData,
-            null,
-            2
-          )
-        );
-      }
+      const heartBeats = records.map(record => ({
+        y: record.heart_rate,
+        x: record.timer_time
+      }));
+      const chartData = [
+        {
+          id: 'heart_rate',
+          data: heartBeats
+        }
+      ];
+      res.send(chartData);
     }
-  );
+  });
 }
 
 app.use(express.static('dist'));
@@ -80,85 +54,65 @@ app.use(express.static('dist'));
 app.use(bodyParser.json());
 // app.use(cors);
 
-const path = './test2.gpx';
-// app.get('/api/gpx', (req, res, next) => {
-//   if (!fs.existsSync(path)) {
-//     next(`The file ${path} doesn't exist`);
-//   }
-
-//   gpxParse.parseGpxFromFile(path, (error, data) => {
-//     if (error) {
-//       next(`error: ${error}`);
-//     } else {
-//       res.send(`success, tracks number=${data.tracks.length}`);
-//     }
-//   });
-// });
-app.get(
-  '/api/fit',
-  async (req, res, next) => {
-    const fitPath = './test.fit';
-    if (!fs.existsSync(fitPath)) {
-      next(
-        `The file ${fitPath} doesn't exist`
-      );
-    }
-    if (savedFile != null) {
-      return fitParse(
-        savedFile.buffer,
-        next,
-        req,
-        res
-      );
-    }
-    return fs.readFile(
-      fitPath,
-      (err, content) => {
-        return fitParse(
-          content,
-          next,
-          req,
-          res
-        );
-      }
-    );
+app.get('/api/fit', async (req, res, next) => {
+  const fitPath = './test.fit';
+  if (!fs.existsSync(fitPath)) {
+    next(`The file ${fitPath} doesn't exist`);
   }
-);
+  if (savedFiles != null) {
+    // savedFiles.forEach(file => fitParse(file.buffer, next, req, res));
+    const files = savedFiles.map(file => ({
+      name: file.originalname,
+      content: file.buffer
+    }));
 
-app.post(
-  '/api/upload',
-  upload.single('file'),
-  async (req, res, next) => {
-    if (req.file !== undefined) {
-      savedFile = req.file;
-      res.end();
-    } else {
-      next('Body was empty');
-    }
+    const fitParser = new FitParser({
+      force: true,
+      speedUnit: 'km/h',
+      lengthUnit: 'km',
+      temperatureUnit: 'celsius',
+      elapsedRecordField: true,
+      mode: 'cascade'
+    });
+
+    const parseFit = promisfy(fitParser.parse, fitParser);
+
+    const datumPromises = files.map(file => {
+      return parseFit(file.content).then(data => {
+        // Handle result of parse method
+        const {records} = data.activity.sessions[0].laps[0];
+
+        const heartBeats = records.map(record => ({
+          y: record.heart_rate,
+          x: record.timer_time
+        }));
+        return {
+          id: file.name,
+          data: heartBeats
+        };
+      });
+    });
+
+    Promise.all(datumPromises)
+      .then(datum => res.send(datum))
+      .catch(next);
+  } else {
+    return fs.readFile(fitPath, (err, content) => {
+      return fitParse(content, next, req, res);
+    });
   }
-);
+});
 
-// app.post('/api/todos', async (req, res, next) => {
-//   if (req.body === undefined) {
-//     next(`sent bad data for todos to server: "${JSON.stringify(req.body)}"`);
-//     return;
-//   }
+app.post('/api/upload', upload.array('files'), async (req, res, next) => {
+  if (req.files !== undefined) {
+    savedFiles = req.files;
+    console.log('test ', req.files);
+    res.end();
+  } else {
+    next('Body was empty');
+  }
+});
 
-//   try {
-//     await writeTodosFile(req.body).catch(next);
-//   } catch (e) {
-//     next(`failed to write`);
-//     return;
-//   }
-
-//   res.end();
-// });
-
-app.listen(
-  process.env.PORT || 8080,
-  () =>
-    console.log(
-      `Listening on port ${process.env
-        .PORT || 8080}!`
-    )
+app.listen(process.env.PORT || 8080, () =>
+  console.log(`Listening on port ${process.env.PORT || 8080}!`)
 );

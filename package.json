@@ -8,7 +8,7 @@
     "start": "npm run build && node src/server/index.js",
     "client": "webpack-dev-server --mode development --devtool inline-source-map --hot",
     "server": "nodemon src/server/index.js",
-    "dev": "lsof -ti:3000 | xargs kill;  lsof -ti:8080 | xargs kill; concurrently \"npm run server\" \"npm run client\""
+    "dev": "lsof -ti:3000 | xargs kill -9;  lsof -ti:8080 | xargs kill -9; concurrently \"npm run server\" \"npm run client\""
   },
   "author": "Ben",
   "dependencies": {
@@ -19,6 +19,7 @@
     "express": "^4.17.1",
     "fit-file-parser": "^1.6.17",
     "multer": "^1.4.2",
+    "promisfy": "^1.2.0",
     "prop-types": "^15.6.2",
     "react": "^16.12.0",
     "react-dom": "^16.12.0"
